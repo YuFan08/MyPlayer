@@ -1,83 +1,78 @@
-# MPV 极速定制优化配置（Intel UHD 630 / Windows）
+# MPV 极速定制优化配置（Windows / Intel 核显优先）
 
-一套面向 **Intel UHD 630 等核显**的 `mpv` 便携配置，目标是：
+一套面向 Windows 的 `mpv` 便携配置，主要目标是：
 
-- **强制核显渲染/硬解**：尽量让独显保持休眠（更安静、低发热）
-- **网络流更稳**：HLS/直播源抖动时尽量不断流、少卡顿
-- **切后台更稳**：为老驱动/笔记本场景准备兼容保底开关
-
-> 核心策略不是“把所有狠招都开到全局”，而是通过 **profiles** 把副作用隔离：本地/点播用默认，直播/顽固黑屏再切换专用 profile。
+- **强制核显渲染/硬解**：锁定 `D3D11 + Intel`，尽量让独显保持休眠（更安静、低发热）
+- **多窗口/切后台更稳**：偏稳定性的 D3D11 开关与解码路径设置，降低“切后台黑屏/唤醒失败”概率
+- **网络流更稳**：更强缓存、FFmpeg 级别重连、HLS 码率与请求头伪装
 
 ---
 
-## 快速开始
+## 快速开始（便携模式）
 
-1. 使用较新的 Windows `mpv`（建议官方构建或可信发行版）。
-2. 将本仓库的 `portable_config/` 放到 `mpv.exe` 同级目录（便携模式）。
-3.（可选）把 `yt-dlp.exe` 放到 `mpv.exe` 同级目录，用于解析 YouTube/B站等网络视频。
+1. 准备较新的 Windows `mpv.exe`（建议官方构建或可信发行版）。
+2. 将本仓库的 `portable_config/` 放到 `mpv.exe` 同级目录（便携模式会自动生效）。
+3. （可选）把 `yt-dlp.exe` 放到 `mpv.exe` 同级目录，用于解析 YouTube/B站等网站视频。
 
 ---
 
 ## 配置文件说明
 
-### `portable_config/mpv.conf`（默认推荐）
+### `portable_config/mpv.conf`
 
-该文件内置多个 profile：
+当前配置为“全局一套参数”（不依赖 profile）。核心内容如下：
 
-- **默认**：`[default]`  
-  - 强制 `D3D11 + Intel` 路径（`d3d11-adapter=Intel`、`hwdec=d3d11va`）
-  - 更少“直播专属狠招”，副作用更小
-
-- **直播/网络流增强**：`[live]`  
-  - 更强缓存/重连/伪装
-  - 同时启用更偏“切后台稳”的渲染兼容开关（可能牺牲效率）
-
-- **不安全兜底**：`[live-unsafe]`  
-  - 在 `live` 基础上 **关闭 TLS 证书校验**
-  - 仅建议用于你完全信任的源/网络环境（见下方安全提示）
-
-- **兼容/保底**：`[compat]`  
-  - 专门应对“切后台黑屏/唤醒失败”等顽固问题
-
-#### 怎么使用 profile
-
-- **默认播放**（本地/点播）：直接打开即可
-
-- **直播/网络流更稳**：
-
-```bash
-mpv --profile=live "<url>"
-```
-
-- **遇到证书/抓包环境导致无法播放（不安全）**：
-
-```bash
-mpv --profile=live-unsafe "<url>"
-```
-
-- **遇到切后台黑屏/唤醒问题**：
-
-```bash
-mpv --profile=compat "<file-or-url>"
-```
-
----
-
-## `portable_config/mpv-4k.conf`
-
-面向桌面/4K 屏幕的配置变体（更偏向高分辨率体验）。用法同上，按需替换或参考其中参数。
+- **渲染/硬解（强制核显）**
+  - `vo=gpu-next`
+  - `gpu-api=d3d11`
+  - `d3d11-adapter=Intel`
+  - `hwdec=d3d11va`
+  - `d3d11-output-format=auto`
+- **切换稳定性优先**
+  - `d3d11-flip=no`
+  - `d3d11-exclusive-fs=no`
+  - `vd-lavc-dr=no`
+- **低负载画质**
+  - `scale=bicubic`、`cscale=bicubic`、`dscale=mitchell`
+  - `deband=no`
+  - `dither-depth=auto`
+- **网络流/直播增强**
+  - 缓存：`cache=yes`、`demuxer-max-bytes=400MiB`、`demuxer-max-back-bytes=100MiB`、`demuxer-readahead-secs=45`
+  - 暂停等缓冲：`cache-pause=yes`、`cache-pause-wait=2`
+  - 重连：`demuxer-reconnect-timeout=60`、`demuxer-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5`
+  - 超时：`network-timeout=100`
+  - HLS：`hls-bitrate=max`
+  - 伪装：`user-agent=...`、`http-header-fields='Referer: https://www.google.com/'`
+  - 拖拽：`force-seekable=yes`（仅在你确实需要“在缓存范围内拖拽”时才建议保留）
+- **yt-dlp 格式策略**
+  - `ytdl-format="bestvideo[height<=1080][vcodec!^=av01]+bestaudio/bestvideo[height<=1080]+bestaudio/best"`
+- **窗口与交互**
+  - 最小化启动：`window-minimized=yes`
+  - 初始窗口：`geometry=1280x720+50%+50%`、`autofit-larger=90%x90%`
+  - 简洁 UI：`border=no`、`osc=no`、`osd-bar=no`
+- **进度记忆**
+  - `save-position-on-quit=yes`
+  - `watch-later-directory="~~/watch_later"`
+- **音频**
+  - `ao=wasapi`
+  - `volume=30`、`volume-max=100`
+  - `audio-pitch-correction=yes`
+  - `video-sync=display-resample`
 
 ---
 
-## 关键点（设计取舍）
+## 使用方式
 
-- **强制核显**：通过 `gpu-api=d3d11` + `d3d11-adapter=Intel` 把渲染钉在核显上；独显更容易保持休眠。  
-- **直播更稳但有代价**：`cache`/`reconnect`/`cache-pause` 能减少“卡一下喘一下”，但会带来更高内存占用、以及更明显的“等缓冲暂停”。  
-- **兼容开关集中管理**：`d3d11-flip=no`、`vd-lavc-dr=no` 等更偏“稳”的开关只在 `live/compat` 里启用，避免污染本地播放的功耗/性能。
+- **本地文件**：直接拖拽到 `mpv.exe` 或双击打开即可
+- **网络流/HLS**：
+
+```bash
+mpv "<url>"
+```
 
 ---
 
 ## 安全提示（重要）
 
-`[live-unsafe]` 会设置 `tls-verify=no`，这意味着 **HTTPS 证书不再校验**，存在被劫持/中间人攻击的风险。  
-除非你明确知道自己在做什么，否则请优先使用 `--profile=live`，不要用 `live-unsafe`。
+当前 `mpv.conf` **全局设置了** `tls-verify=no`，这意味着 **HTTPS 证书不再校验**，存在被劫持/中间人攻击风险。  
+如果你不需要此能力，建议改回 `tls-verify=yes`（或删除该行使用默认行为）。
