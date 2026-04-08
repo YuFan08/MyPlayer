@@ -52,22 +52,36 @@
    - 可选：在配置中取消注释 `script-opts=ytdl_hook-ytdl_path=...` 指定 `yt-dlp.exe` 路径
 
 7. **窗口与 OSD**  
-   - `window-minimized=yes`  
+   - `window-minimized=no`  
    - `geometry=1280x720+50%+50%`、`autofit-larger=90%x90%`  
    - `border=no`、`osc=no`、`osd-bar=no`
 
 8. **播放进度（watch later）**  
-   - `save-position-on-quit=yes`、`watch-later-directory="~~/watch_later"`  
-   - `watch-later-options-append=write-filename-in-watch-later-config`  
-   - `watch-later-options-remove=sub-pos`、`watch-later-options-remove=osd-margin-y`
+   - `save-position-on-quit=yes`  
+   - `write-filename-in-watch-later-config=yes`（在进度文件中保存文件名以便排查）
+   - `watch-later-options-remove=sub-pos`、`watch-later-options-remove=osd-margin-y`（不记录字幕位置等临时状态）
 
 9. **输入与掉帧**  
-   - `framedrop=vo`、`input-cursor-passthrough=no`
+   - `framedrop=vo`  
+   - `input-cursor-passthrough=no`
 
 10. **音频与同步**  
     - `ao=wasapi`、`volume-max=100`、`volume=30`  
     - `audio-pitch-correction=yes`、`audio-file-auto=fuzzy`  
     - `video-sync=display-resample`
+
+---
+
+## 快捷键说明 (`portable_config/input.conf`)
+
+本配置添加了几个常用的快捷键：
+
+- **`ENTER`**：切换全屏
+- **`UP` / `DOWN` 方向键**：调节音量
+- **`LEFT` / `RIGHT` 方向键**：后退 / 前进 10 秒
+- **`ESC` (智能按键)**： 
+  - 第一下：如果处于全屏或最大化，则**退出全屏/恢复窗口**。
+  - 第二下（或已经是窗口状态）：**最小化并自动暂停播放**。
 
 ---
 
