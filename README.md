@@ -4,7 +4,7 @@
 
 - **强制核显渲染/硬解**：锁定 `D3D11 + Intel`，尽量让独显保持休眠（更安静、低发热）
 - **多窗口/切后台更稳**：偏稳定性的 D3D11 开关与解码路径设置，降低“切后台黑屏/唤醒失败”概率
-- **网络流更稳**：更强缓存、FFmpeg 级别重连、HLS 码率与请求头伪装
+- **网络流更稳**：更强缓存、FFmpeg 级别 HTTP 重连、HLS 码率与请求头伪装
 
 ---
 
@@ -20,44 +20,54 @@
 
 ### `portable_config/mpv.conf`
 
-当前配置为“全局一套参数”（不依赖 profile）。核心内容如下：
+当前配置为“全局一套参数”（不依赖 profile）。文件内按 **10 个区块** 排版，下面按区块概括（具体以仓库内文件为准）。
 
-- **渲染/硬解（强制核显）**
-  - `vo=gpu-next`
-  - `gpu-api=d3d11`
-  - `d3d11-adapter=Intel`
-  - `hwdec=d3d11va`
-  - `d3d11-output-format=auto`
-- **切换稳定性优先**
-  - `d3d11-flip=no`
-  - `d3d11-exclusive-fs=no`
-  - `vd-lavc-dr=no`
-- **低负载画质**
-  - `scale=bicubic`、`cscale=bicubic`、`dscale=mitchell`
-  - `deband=no`
-  - `dither-depth=auto`
-- **网络流/直播增强**
-  - 缓存：`cache=yes`、`demuxer-max-bytes=400MiB`、`demuxer-max-back-bytes=100MiB`、`demuxer-readahead-secs=45`
-  - 暂停等缓冲：`cache-pause=yes`、`cache-pause-wait=2`
-  - 重连：`demuxer-reconnect-timeout=60`、`demuxer-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_delay_max=5`
-  - 超时：`network-timeout=100`
-  - HLS：`hls-bitrate=max`
-  - 伪装：`user-agent=...`、`http-header-fields='Referer: https://www.google.com/'`
-  - 拖拽：`force-seekable=yes`（仅在你确实需要“在缓存范围内拖拽”时才建议保留）
-- **yt-dlp 格式策略**
-  - `ytdl-format="bestvideo[height<=1080][vcodec!^=av01]+bestaudio/bestvideo[height<=1080]+bestaudio/best"`
-- **窗口与交互**
-  - 最小化启动：`window-minimized=yes`
-  - 初始窗口：`geometry=1280x720+50%+50%`、`autofit-larger=90%x90%`
-  - 简洁 UI：`border=no`、`osc=no`、`osd-bar=no`
-- **进度记忆**
-  - `save-position-on-quit=yes`
-  - `watch-later-directory="~~/watch_later"`
-- **音频**
-  - `ao=wasapi`
-  - `volume=30`、`volume-max=100`
-  - `audio-pitch-correction=yes`
-  - `video-sync=display-resample`
+1. **解码与输出（强制核显）**  
+   - `vo=gpu-next`、`gpu-api=d3d11`、`d3d11-adapter=Intel`  
+   - `hwdec=d3d11va`、`d3d11-output-format=auto`
+
+2. **全屏与窗口切换（稳定性优先）**  
+   - `d3d11-flip=no`、`d3d11-exclusive-fs=no`、`vd-lavc-dr=no`
+
+3. **缩放与画质**  
+   - `scale=bicubic`、`cscale=bicubic`、`dscale=mitchell`（另保留注释行 `#dscale=bicubic` 便于切换）  
+   - `dither-depth=auto`、`deband=yes`（高负载若卡顿可改为 `no`）
+
+4. **缓存与解复用**  
+   - `cache=yes`、`demuxer-max-bytes=400MiB`、`demuxer-max-back-bytes=100MiB`  
+   - `demuxer-readahead-secs=45`、`demuxer-thread=yes`  
+   - `demuxer-reconnect-timeout=70`（与下方 lavf/HTTP 重试总时长配套）  
+   - `cache-pause=yes`、`cache-pause-wait=2`、`force-seekable=yes`
+
+5. **网络与直播（HLS / HTTP）**  
+   - `user-agent`：模拟常见桌面 Chrome，降低被源站刁难概率  
+   - `demuxer-lavf-o=reconnect=1,reconnect_streamed=1,reconnect_on_network_error=1,reconnect_max_retries=6,reconnect_delay_max=120,reconnect_delay_total_max=70`  
+     - HTTP 重连为 **指数退避**（约 0→1→3→7→15→31 秒量级），**不是**固定间隔；`reconnect_max_retries=6` 与 `reconnect_delay_total_max` 用于限制轮次与累计等待  
+   - `network-timeout=100`、`hls-bitrate=max`  
+   - `http-header-fields='Referer: https://www.google.com/'`  
+   - `tls-verify=no`（见下文安全提示）
+
+6. **yt-dlp**  
+   - `ytdl-format="bestvideo[height<=1080][vcodec!^=av01]+bestaudio/bestvideo[height<=1080]+bestaudio/best"`  
+   - 可选：在配置中取消注释 `script-opts=ytdl_hook-ytdl_path=...` 指定 `yt-dlp.exe` 路径
+
+7. **窗口与 OSD**  
+   - `window-minimized=yes`  
+   - `geometry=1280x720+50%+50%`、`autofit-larger=90%x90%`  
+   - `border=no`、`osc=no`、`osd-bar=no`
+
+8. **播放进度（watch later）**  
+   - `save-position-on-quit=yes`、`watch-later-directory="~~/watch_later"`  
+   - `watch-later-options-append=write-filename-in-watch-later-config`  
+   - `watch-later-options-remove=sub-pos`、`watch-later-options-remove=osd-margin-y`
+
+9. **输入与掉帧**  
+   - `framedrop=vo`、`input-cursor-passthrough=no`
+
+10. **音频与同步**  
+    - `ao=wasapi`、`volume-max=100`、`volume=30`  
+    - `audio-pitch-correction=yes`、`audio-file-auto=fuzzy`  
+    - `video-sync=display-resample`
 
 ---
 
@@ -75,4 +85,4 @@ mpv "<url>"
 ## 安全提示（重要）
 
 当前 `mpv.conf` **全局设置了** `tls-verify=no`，这意味着 **HTTPS 证书不再校验**，存在被劫持/中间人攻击风险。  
-如果你不需要此能力，建议改回 `tls-verify=yes`（或删除该行使用默认行为）。
+若你不需要此能力，建议改为 `tls-verify=yes`（或删除该行使用默认行为）。
